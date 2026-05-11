@@ -8,7 +8,7 @@ from collections import defaultdict
 import matplotlib
 matplotlib.use("Agg")  # safe for terminal / server runs
 import matplotlib.pyplot as plt
-
+import random
 from data.generator import load_instance
 from exact.dynamic_programming import solve_dp
 from exact.ILP import solve_ilp
@@ -282,21 +282,89 @@ def execute_method(method, n, weights, q, P, c, seed=42):
     result["runtime"] = time.perf_counter() - start
     return result
 
+def exact_reference(n, weights, q, P, c, seed=42):
+    """
+    True optimal reference using exact methods.
+    Only feasible for small instances.
+    """
 
-def get_reference(n, weights, q, P, c, seed=42):
-    """
-    Reference solution used for gap calculation:
-      - DP for n <= 20
-      - ILP (time-limited) for larger instances
-    """
+    start = time.time()
+
     if n <= 20:
-        ref = execute_method("DP", n, weights, q, P, c, seed=seed)
-        ref["reference_method"] = "DP"
+        res = execute_method("DP", n, weights, q, P, c, seed=seed)
+        method = "DP"
     else:
-        ref = execute_method("ILP", n, weights, q, P, c, seed=seed)
-        ref["reference_method"] = "ILP"
+        # ILP is allowed but time-limited
+        res = execute_method("ILP", n, weights, q, P, c, seed=seed)
+        method = "ILP"
 
-    return ref
+    end = time.time()
+
+    return {
+        "profit": res["profit"],
+        "reference_method": method,
+        "solver_status": res.get("solver_status", "OPT"),
+        "runtime": end - start
+    }   
+def heuristic_reference(n, weights, q, P, c, seed=42, n_runs=3):
+    """
+    Best Known Solution (BKS) reference for large instances.
+    Combines multiple metaheuristics and keeps the best result.
+    """
+
+    rng = random.Random(seed)
+
+    best_profit = float("-inf")
+    best_method = "BKS"
+    start = time.time()
+
+    # ─────────────────────────────
+    # GA runs
+    # ─────────────────────────────
+    for _ in range(n_runs):
+        profit, _, _ = genetic_algorithm(
+            n, weights, q, P, c,
+            seed=rng.randint(0, 10**9)
+        )
+        if profit > best_profit:
+            best_profit = profit
+            best_method = "GA"
+
+    # ─────────────────────────────
+    # ILS runs
+    # ─────────────────────────────
+    for _ in range(n_runs):
+        profit, _, _ = iterated_local_search(
+            n, weights, q, P, c
+        )
+        if profit > best_profit:
+            best_profit = profit
+            best_method = "ILS"
+
+    # ─────────────────────────────
+    # SA runs
+    # ─────────────────────────────
+    for _ in range(n_runs):
+        profit, _, _ = simulated_annealing(
+            n, weights, q, P, c
+        )
+        if profit > best_profit:
+            best_profit = profit
+            best_method = "SA"
+
+    end = time.time()
+
+    return {
+        "profit": best_profit,
+        "reference_method": best_method,
+        "solver_status": "BKS (heuristic best known solution)",
+        "runtime": end - start
+    }
+def get_reference(n, weights, q, P, c):
+    if n <= 20:
+        return exact_reference(n,weights,q,P,c)
+    else:
+        return heuristic_reference(n,weights,q,P,c)
 
 
 def safe_mean(values):
@@ -337,14 +405,16 @@ def main():
 
         difficulty = classify_instance(density, cap_ratio)
 
-        reference = get_reference(n, weights, q, P, c, seed=seed)
+        reference = get_reference(n, weights, q, P, c)
         ref_profit = reference["profit"]
         ref_method = reference["reference_method"]
         ref_status = reference["solver_status"]
         ref_time = reference["runtime"]
 
         for method in METHODS:
-            if method == "DP" and n > 20:
+            if (method in ["DP", "B&B Improved", "B&B"] and n > 20):
+                continue
+            if method == "ILP" and n > 50:
                 continue
             if method == "B&B Improved" and branch_and_bound_improved is None:
                 continue

@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from data.generator import load_instance
 from exact.dynamic_programming import solve_dp
 from exact.ILP import solve_ilp
-from simulated_annealing import compute_profit
+from .simulated_annealing import compute_profit
 
 
 # ── helper functions ──────────────────────────────────────────────────────────
@@ -362,7 +362,8 @@ if __name__ == "__main__":
         # run ILS
         start      = time.time()
         ils_profit, ils_subset, iters = iterated_local_search(
-            n, weights, q, P, c
+            n, weights, q, P, c,
+            seed=inst.get("seed", 42)
         )
         elapsed    = time.time() - start
 
@@ -373,7 +374,7 @@ if __name__ == "__main__":
             opt_str = str(opt)
             total_gap   += gap
             total_count += 1
-        elif n <= 60:
+        elif n <= 30:
             opt, _, status, _ = solve_ilp(
                 n, weights, q, P, c, time_limit=60
             )

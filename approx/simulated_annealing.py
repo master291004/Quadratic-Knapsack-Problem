@@ -213,13 +213,13 @@ if __name__ == "__main__":
 
     test_files = [
         f"data/instances/n{n}_d{int(d*100)}_s{s}.json"
-        for n in [10, 15, 20, 30, 50]
+        for n in [10, 15, 20, 30, 50, 100]
         for d in [0.25, 0.50, 0.75, 1.0]
         for s in range(10)
     ]
 
     print(f"{'Instance':<30} {'SA':>8} {'OPT':>8} "
-          f"{'Gap%':>8} {'Iter':>8} {'Time(s)':>10}")
+      f"{'Gap%':>8} {'Iter':>8} {'Time(s)':>10} {'Type':>10}")
     print("-" * 80)
 
     for path in test_files:
@@ -235,11 +235,11 @@ if __name__ == "__main__":
             inst["P"],
             inst["c"]
         )
-
+        itype = inst.get("interaction_type", "balanced")
         # run SA
         start      = time.time()
         sa_profit, sa_subset, iters = simulated_annealing(
-            n, weights, q, P, c
+            n, weights, q, P, c,seed=inst.get("seed", 42)
         )
         elapsed    = time.time() - start
 
@@ -255,4 +255,4 @@ if __name__ == "__main__":
 
         name = os.path.basename(path)
         print(f"{name:<30} {sa_profit:>8} {opt_str:>8} "
-              f"{gap:>8.2f} {iters:>8} {elapsed:>10.4f}")
+      f"{gap:>8.2f} {iters:>8} {elapsed:>10.4f} {itype:>10}")

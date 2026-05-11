@@ -15,104 +15,108 @@ except ImportError:
 
 def solve_ilp(n, weights, q, P, c, time_limit=300, verbose=False):
     """
-    Exact QKP solver using Binary ILP with linearization.
+    Exact ILP solver for the Quadratic Knapsack Problem (QKP).
 
-    Formulation:
-        max  sum_j q[j]*x[j] + sum_{i<j} P[i][j]*y[i][j]
-        s.t. sum_j w[j]*x[j] <= c
-             y[i][j] <= x[i]   for all i < j
-             y[i][j] <= x[j]   for all i < j
-             x[j]    in {0,1}
-             y[i][j] in {0,1}
-
-    Parameters:
-        n          : number of items
-        weights    : list of item weights
-        q          : list of individual profits
-        P          : n x n profit matrix
-        c          : knapsack capacity
-        time_limit : solver time limit in seconds (default 300)
-        verbose    : print solver logs if True
+    Model:
+        max  sum_i q_i x_i + sum_{i<j} P_ij y_ij
+        s.t. sum_i w_i x_i <= c
+             y_ij <= x_i
+             y_ij <= x_j
+             x_i, y_ij ∈ {0,1}
 
     Returns:
-        best_profit : optimal profit found
-        best_subset : list of selected item indices
-        status      : solver status string
-        gap         : optimality gap (0.0 means proven optimal)
+        best_profit: optimal objective value
+        best_subset: selected item indices
+        status: solver status
+        solve_time: time spent solving
     """
 
-    # ── create the problem ────────────────────────────────────────────────────
-    prob = pulp.LpProblem("QKP", pulp.LpMaximize)
+    # ─────────────────────────────────────────────
+    # Build model
+    # ─────────────────────────────────────────────
+    model = pulp.LpProblem("QKP", pulp.LpMaximize)
 
-    # ── decision variables ────────────────────────────────────────────────────
+    # ── Decision variables ───────────────────────
+    x = pulp.LpVariable.dicts("x", range(n), cat="Binary")
 
-    # x[j] = 1 if item j is selected
-    x = [pulp.LpVariable(f"x_{j}", cat="Binary") for j in range(n)]
-
-    # y[i][j] = 1 if both items i and j are selected (only for i < j)
     y = {}
     for i in range(n):
         for j in range(i + 1, n):
-            if P[i][j] > 0:   # only create variable if profit is nonzero
+            if P[i][j] != 0:
                 y[(i, j)] = pulp.LpVariable(f"y_{i}_{j}", cat="Binary")
 
-    # ── objective function ────────────────────────────────────────────────────
-    prob += (
-        pulp.lpSum(q[j] * x[j] for j in range(n)) +
+    # ── Objective function ───────────────────────
+    model += (
+        pulp.lpSum(q[i] * x[i] for i in range(n)) +
         pulp.lpSum(P[i][j] * y[(i, j)] for (i, j) in y)
     )
 
-    # ── constraints ──────────────────────────────────────────────────────────
+    # ── Capacity constraint ───────────────────────
+    model += pulp.lpSum(weights[i] * x[i] for i in range(n)) <= c
 
-    # knapsack capacity
-    prob += pulp.lpSum(weights[j] * x[j] for j in range(n)) <= c
-
-    # linearization constraints — y[i][j] can be 1 only if both x[i] and x[j] are 1
+    # ── Linearization constraints ────────────────
     for (i, j) in y:
-        prob += y[(i, j)] <= x[i]
-        prob += y[(i, j)] <= x[j]
+        model += y[(i, j)] <= x[i]
+        model += y[(i, j)] <= x[j]
 
-    # ── solve ─────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────
+    # Solve
+    # ─────────────────────────────────────────────
     solver = pulp.PULP_CBC_CMD(
-        timeLimit = time_limit,
-        gapRel    = 0.0,       # require proven optimality
-        msg       = 1 if verbose else 0
+        timeLimit=time_limit,
+        msg=verbose
     )
 
-    prob.solve(solver)
+    start = time.time()
+    model.solve(solver)
+    solve_time = time.time() - start
 
-    # ── extract solution ──────────────────────────────────────────────────────
-    status = pulp.LpStatus[prob.status]
+    status = pulp.LpStatus[model.status]
 
-    best_subset = [j for j in range(n)
-                   if pulp.value(x[j]) is not None
-                   and pulp.value(x[j]) > 0.5]
+    # ─────────────────────────────────────────────
+    # Extract solution
+    # ─────────────────────────────────────────────
+    best_subset = [
+        i for i in range(n)
+        if x[i].value() is not None and x[i].value() > 0.5
+    ]
 
-    best_profit = int(round(pulp.value(prob.objective))) \
-                  if pulp.value(prob.objective) is not None else 0
+    best_profit = pulp.value(model.objective)
+    if best_profit is None:
+        best_profit = 0
+    else:
+        best_profit = int(round(best_profit))
 
-    # optimality gap — 0.0 means proven optimal
-    gap = abs(prob.sol_status) if prob.sol_status else 0.0
+    # ─────────────────────────────────────────────
+    # Optional: feasibility check (debug-safe)
+    # ─────────────────────────────────────────────
+    assert sum(weights[i] for i in best_subset) <= c + 1e-6, \
+        "Capacity constraint violated!"
 
-    return best_profit, best_subset, status, gap
-
+    return best_profit, best_subset, status, solve_time
 
 # ── run when executed directly ────────────────────────────────────────────────
 if __name__ == "__main__":
 
+    import os
+    import time
+
+    sizes = [10, 15, 20, 30]
+    densities = [0.25, 0.50, 0.75, 1.0]
+    seeds = range(10)
+
     test_files = [
         f"data/instances/n{n}_d{int(d*100)}_s{s}.json"
-        for n in [10, 15, 20, 30]
-        for d in [0.25, 0.50, 0.75, 1.0]
-        for s in range(10)
+        for n in sizes
+        for d in densities
+        for s in seeds
     ]
 
-    print(f"{'Instance':<30} {'ILP':>8} {'DP':>8} "
-          f"{'Time(s)':>10} {'Status':>12} {'Check':>8}")
-    print("-" * 85)
+    print(f"{'Instance':<35} {'ILP':>8} {'DP':>8} {'ILP(s)':>10} {'DP(s)':>10} {'Status':>10} {'Check':>8}")
+    print("-" * 95)
 
+    total_checked = 0
     total_wrong = 0
-    total_files = 0
 
     for path in test_files:
 
@@ -120,39 +124,45 @@ if __name__ == "__main__":
             continue
 
         inst = load_instance(path)
-        n, weights, q, P, c = (
-            inst["n"],
-            inst["weights"],
-            inst["q"],
-            inst["P"],
-            inst["c"]
-        )
+        n = inst["n"]
+        weights = inst["weights"]
+        q = inst["q"]
+        P = inst["P"]
+        c = inst["c"]
 
-        # run ILP
-        start = time.time()
-        ilp_profit, ilp_subset, status, gap = solve_ilp(
-            n, weights, q, P, c, verbose=False
-        )
-        elapsed = time.time() - start
+        # ─────────────────────────────
+        # ILP solve
+        # ─────────────────────────────
+        t0 = time.time()
+        ilp_profit, ilp_subset, status, _ = solve_ilp(n, weights, q, P, c)
+        ilp_time = time.time() - t0
 
-        # ground truth — only for n <= 20 (DP too slow otherwise)
+        # ─────────────────────────────
+        # DP reference (small instances only)
+        # ─────────────────────────────
         if n <= 20:
+            t1 = time.time()
             dp_profit, _ = solve_dp(n, weights, q, P, c)
-            check = "OK" if ilp_profit == dp_profit else "WRONG"
-            dp_str = str(dp_profit)
-        else:
-            dp_profit = None
-            check     = "N/A"
-            dp_str    = "N/A"
+            dp_time = time.time() - t1
 
+            check = "OK" if ilp_profit == dp_profit else "WRONG"
+        else:
+            dp_profit = "N/A"
+            dp_time = "N/A"
+            check = "N/A"
+
+        # ─────────────────────────────
+        # stats
+        # ─────────────────────────────
         if check == "WRONG":
             total_wrong += 1
-        total_files += 1
+
+        total_checked += 1
 
         name = os.path.basename(path)
-        print(f"{name:<30} {ilp_profit:>8} {dp_str:>8} "
-              f"{elapsed:>10.4f} {status:>12} {check:>8}")
 
-    print("-" * 85)
-    print(f"Total wrong: {total_wrong} / {len([f for f in test_files if n <= 20])}")
-    print(f"\nNote: ILP can handle n=30 and beyond — DP used only as check for n<=20")
+        print(f"{name:<35} {ilp_profit:>8} {dp_profit:>8} "
+            f"{ilp_time:>10.4f} {dp_time:>10.4f} {status:>10} {check:>8}")
+    print("-" * 95)
+    print(f"Checked instances: {total_checked}")
+    print(f"Wrong ILP vs DP: {total_wrong} (n <= 20 only)")

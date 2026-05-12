@@ -384,7 +384,7 @@ def main():
 
     rows = []
 
-    print("Running benchmark...\n")
+    print("Running benchmark(this may take some time)...\n")
 
     for path in test_files:
         inst = load_instance(path)

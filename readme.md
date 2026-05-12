@@ -85,7 +85,7 @@ QKP_project/
 └── results/
     ├── csv/                        # benchmark_results.csv
     └── plots/                      # all generated figures
-
+```
 ## Requirements
 
 Python 3.10+ is required (developed and tested on Python 3.13).

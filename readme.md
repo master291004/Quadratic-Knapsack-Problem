@@ -59,6 +59,8 @@ otherwise) and used to measure the **optimality gap** of every other method.
 ---
 
 ## Project Structure
+
+```text
 QKP_project/
 ├── main.py                         # run everything with one command
 ├── instance_generator.py           # stage 1: generate instances
@@ -81,10 +83,8 @@ QKP_project/
 │   └── ILS.py
 │
 └── results/
-├── csv/                        # benchmark_results.csv
-└── plots/                      # all generated figures
-
----
+    ├── csv/                        # benchmark_results.csv
+    └── plots/                      # all generated figures
 
 ## Requirements
 

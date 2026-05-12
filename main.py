@@ -10,6 +10,6 @@ def run(script):
     return result
 
 if __name__ == "__main__":
-    run("instance_generator.py")
+    run("data/generator.py")
     run("benchmark.py")
     print("\n✓ Done. Results are in results/csv/ and results/plots/")

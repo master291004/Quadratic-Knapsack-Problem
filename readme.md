@@ -23,7 +23,7 @@ instances of varying size and difficulty.
 
 ## What does the code do?
 
-The project is organized as a pipeline with 3 stages:
+The project is organized as a pipeline with 2 stages:
 
 **1. Instance Generation** — `instance_generator.py`  
 Generates a large set of QKP test instances with controlled parameters: number of items,
@@ -33,10 +33,7 @@ files in `data/instances/`.
 **2. Benchmark** — `benchmark.py`  
 Runs all 6 solving methods on every instance and records the result of each run: profit
 found, optimality gap, runtime, feasibility, and more. Everything is saved to a CSV file
-for analysis.
-
-**3. Analysis** — `analyze_results.py`  
-Reads the CSV and produces summary tables and plots comparing the methods across
+for analysis then it Reads the CSV and produces summary tables and plots comparing the methods across
 instance sizes and difficulty classes.
 
 ---

@@ -34,14 +34,13 @@ TARGET_CAPACITY_RATIOS = [0.25, 0.50, 0.75]
 TARGET_SEEDS = list(range(10))
 
 INSTANCE_DIR = "data/instances"
-OUTPUT_CSV = "benchmark_results.csv"
-PLOT_DIR = "benchmark_plots"
+OUTPUT_CSV = "results/csv/benchmark_results.csv"
+PLOT_DIR = "results/plots"
 
 REFERENCE_ILP_TIME_LIMIT = 60
 
-METHODS = ["ILP", "DP", "SA", "ILS", "GA", "B&B"]
-if branch_and_bound_improved is not None:
-    METHODS.append("B&B Improved")
+METHODS = ["ILP", "DP", "SA", "ILS", "GA", "B&B","B&B Improved"]
+
 
 
 # ─────────────────────────────────────────────────────────────
@@ -290,7 +289,7 @@ def exact_reference(n, weights, q, P, c, seed=42):
 
     start = time.time()
 
-    if n <= 20:
+    if n < 20:
         res = execute_method("DP", n, weights, q, P, c, seed=seed)
         method = "DP"
     else:
